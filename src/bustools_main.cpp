@@ -38,6 +38,7 @@
 #include "bustools_predict.h"
 #include "bustools_collapse.h"
 #include "bustools_clusterhist.h"
+#include "bustools_extractforexon.h"
 
 
 
@@ -841,6 +842,37 @@ void parse_ProgramOptions_extract(int argc, char **argv, Bustools_opt &opt) {
   if (opt.files.size() == 1 && opt.files[0] == "-") {
     opt.stream_in = true;
   }
+}
+
+void parse_ProgramOptions_extractforexon(int argc, char **argv, Bustools_opt &opt) {
+  
+  /* Parse options. */
+  const char *opt_string = "o:f:N:p";
+
+  static struct option long_options[] = {
+    {"output", required_argument, 0, 'o'},
+    {"fastq", required_argument, 0, 'f'},
+    {0, 0, 0, 0}
+  };
+
+  int option_index = 0, c;
+
+  while ((c = getopt_long(argc, argv, opt_string, long_options, &option_index)) != -1) {
+    switch (c) {
+      case 'o':
+        opt.output = optarg;
+        break;
+      case 'f':
+        opt.fastq = parseList(optarg);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /* All other argumuments are (sorted) BUS files. */
+  while (optind < argc) opt.files.push_back(argv[optind++]); //should only be one...
+  
 }
 
 
@@ -1823,6 +1855,33 @@ bool check_ProgramOptions_extract(Bustools_opt &opt) {
   return ret;
 }
 
+bool check_ProgramOptions_extractforexon(Bustools_opt &opt) {
+  bool ret = true;
+  
+  if (opt.output.empty()) {
+    std::cerr << "Error: missing output file" << std::endl;
+  }
+
+  if (opt.files.size() != 1) {
+    std::cerr << "Error: Must send in exactly one molecule file" << std::endl;
+    ret = false;
+  }
+
+  if (opt.fastq.size() != 2) {
+    std::cerr << "Error: Need exactly 2 FASTQ files, 10X" << std::endl;
+    ret = false;
+  } else {
+    for (const auto &f : opt.fastq) {
+      if (!checkFileExists(f)) {
+        std::cerr << "Error: File not found, " << f << std::endl;
+        ret = false;
+      }
+    }
+  }
+
+  return ret;
+}
+
 
 void Bustools_Usage() {
   std::cout << "bustools " << BUSTOOLS_VERSION << std::endl << std::endl  
@@ -1839,6 +1898,7 @@ void Bustools_Usage() {
   << "merge           Merge bus files from same experiment" << std::endl
   << "text            Convert a binary BUS file to a tab-delimited text file" << std::endl
   << "extract         Extract FASTQ reads correspnding to reads in BUS file" << std::endl
+  << "extractforexon  Special command for extracting cluster reads from one gene" << std::endl
   << "predict         Correct the count matrix using prediction of unseen species" << std::endl
   << "collapse        Turn BUS files into a BUG file" << std::endl
   << "clusterhist     Create UMI histograms per cluster" << std::endl
@@ -2028,6 +2088,14 @@ void Bustools_extract_Usage() {
     << "-o, --output          Output directory for FASTQ files" << std::endl
     << "-f, --fastq           FASTQ file(s) from which to extract reads (comma-separated list)" << std::endl
     << "-N, --nFastqs         Number of FASTQ file(s) per run" << std::endl
+    << std::endl;
+}
+
+void Bustools_extractforexon_Usage() {
+  std::cout << "Usage: bustools extractforexon [options] molecule-file" << std::endl
+    << "Options: " << std::endl
+    << "-o, --output          Output file" << std::endl
+    << "-f, --fastq           FASTQ file(s) from which to extract reads (comma-separated list)" << std::endl
     << std::endl;
 }
 
@@ -2251,6 +2319,18 @@ int main(int argc, char **argv) {
         bustools_extract(opt);
       } else {
         Bustools_extract_Usage();
+        exit(1);
+      }
+    } else if (cmd == "extractforexon") {
+      if (disp_help) {
+        Bustools_extractforexon_Usage();
+        exit(0);
+      }
+      parse_ProgramOptions_extractforexon(argc-1, argv+1, opt);
+      if (check_ProgramOptions_extractforexon(opt)) { //Program options are valid
+        bustools_extractforexon(opt);
+      } else {
+        Bustools_extractforexon_Usage();
         exit(1);
       }
     } else {

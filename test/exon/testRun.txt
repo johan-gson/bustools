@@ -1,0 +1,6 @@
+../../build/src/bustools extractforexon -o outfile.txt -f 1.fastq.gz,2.fastq.gz Sdk2.gene.molecules.txt
+
+#to run on the real data
+cd /mnt/d/SCDatasets/MCOR3/10xv3/c/L8TX_181211_01_C01_S01_L003/bus_output
+
+/mnt/c/Work/cpp/BustoolsExonExperiments/bustools/build/src/bustools extractforexon -o exonReads.txt -f ../L8TX_181211_01_C01_S01_L003_R1_001.fastq.gz,L8TX_181211_01_C01_S01_L003_R2_001.fastq.gz Sdk2.gene.molecules.txt

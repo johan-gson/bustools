@@ -65,6 +65,9 @@ struct Bustools_opt {
   bool complement = false;
   bool filter = false;
 
+  /* extractforexon*/
+  std::string molInFile;
+  
   /* whitelist */
   int threshold;
 
