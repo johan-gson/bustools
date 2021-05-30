@@ -6,7 +6,7 @@
 #include "Common.hpp"
 #include "BUSData.h"
 
-#include "bustools_extract.h"
+#include "bustools_extractforexon.h"
 #include <map>
 #include "BUSData.h"
 

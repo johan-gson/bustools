@@ -39,6 +39,7 @@
 #include "bustools_collapse.h"
 #include "bustools_clusterhist.h"
 #include "bustools_extractforexon.h"
+#include "bustools_countunmappedmolreads.h"
 
 
 
@@ -845,6 +846,37 @@ void parse_ProgramOptions_extract(int argc, char **argv, Bustools_opt &opt) {
 }
 
 void parse_ProgramOptions_extractforexon(int argc, char **argv, Bustools_opt &opt) {
+  
+  /* Parse options. */
+  const char *opt_string = "o:f:N:p";
+
+  static struct option long_options[] = {
+    {"output", required_argument, 0, 'o'},
+    {"fastq", required_argument, 0, 'f'},
+    {0, 0, 0, 0}
+  };
+
+  int option_index = 0, c;
+
+  while ((c = getopt_long(argc, argv, opt_string, long_options, &option_index)) != -1) {
+    switch (c) {
+      case 'o':
+        opt.output = optarg;
+        break;
+      case 'f':
+        opt.fastq = parseList(optarg);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /* All other argumuments are (sorted) BUS files. */
+  while (optind < argc) opt.files.push_back(argv[optind++]); //should only be one...
+  
+}
+
+void parse_ProgramOptions_countunmappedmolreads(int argc, char **argv, Bustools_opt &opt) {
   
   /* Parse options. */
   const char *opt_string = "o:f:N:p";
@@ -1882,6 +1914,33 @@ bool check_ProgramOptions_extractforexon(Bustools_opt &opt) {
   return ret;
 }
 
+bool check_ProgramOptions_countunmappedmolreads(Bustools_opt &opt) {
+  bool ret = true;
+  
+  if (opt.output.empty()) {
+    std::cerr << "Error: missing output file" << std::endl;
+  }
+
+  if (opt.files.size() == 0) {
+    std::cerr << "Error: missing input file(s)" << std::endl;
+    ret = false;
+  }
+
+  if (opt.fastq.size() % 2 != 0) {
+    std::cerr << "Error: Need pairs of FASTQ files, 10X" << std::endl;
+    ret = false;
+  } else {
+    for (const auto &f : opt.fastq) {
+      if (!checkFileExists(f)) {
+        std::cerr << "Error: File not found, " << f << std::endl;
+        ret = false;
+      }
+    }
+  }
+
+  return ret;
+}
+
 
 void Bustools_Usage() {
   std::cout << "bustools " << BUSTOOLS_VERSION << std::endl << std::endl  
@@ -1898,7 +1957,7 @@ void Bustools_Usage() {
   << "merge           Merge bus files from same experiment" << std::endl
   << "text            Convert a binary BUS file to a tab-delimited text file" << std::endl
   << "extract         Extract FASTQ reads correspnding to reads in BUS file" << std::endl
-  << "extractforexon  Special command for extracting cluster reads from one gene" << std::endl
+  << "countunmappedmolreads  Special command for checking how many unmapped reads that belong to mapped molecules" << std::endl
   << "predict         Correct the count matrix using prediction of unseen species" << std::endl
   << "collapse        Turn BUS files into a BUG file" << std::endl
   << "clusterhist     Create UMI histograms per cluster" << std::endl
@@ -2096,6 +2155,14 @@ void Bustools_extractforexon_Usage() {
     << "Options: " << std::endl
     << "-o, --output          Output file" << std::endl
     << "-f, --fastq           FASTQ file(s) from which to extract reads (comma-separated list)" << std::endl
+    << std::endl;
+}
+
+void Bustools_countunmappedmolreads_Usage() {
+  std::cout << "Usage: bustools countunmappedmolreads [options] sorted-bus-file" << std::endl
+    << "Options: " << std::endl
+    << "-o, --output          Output file" << std::endl
+    << "-f, --fastq           FASTQ file(s) from which to extract reads (comma-separated list), 10X" << std::endl
     << std::endl;
 }
 
@@ -2331,6 +2398,18 @@ int main(int argc, char **argv) {
         bustools_extractforexon(opt);
       } else {
         Bustools_extractforexon_Usage();
+        exit(1);
+      }
+    } else if (cmd == "countunmappedmolreads") {
+      if (disp_help) {
+        Bustools_countunmappedmolreads_Usage();
+        exit(0);
+      }
+      parse_ProgramOptions_countunmappedmolreads(argc-1, argv+1, opt);
+      if (check_ProgramOptions_countunmappedmolreads(opt)) { //Program options are valid
+        bustools_countunmappedmolreads(opt);
+      } else {
+        Bustools_countunmappedmolreads_Usage();
         exit(1);
       }
     } else {

@@ -66,7 +66,7 @@ struct Bustools_opt {
   bool filter = false;
 
   /* extractforexon*/
-  std::string molInFile;
+  std::string exonFile;
   
   /* whitelist */
   int threshold;
