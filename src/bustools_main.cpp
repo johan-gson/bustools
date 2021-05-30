@@ -40,7 +40,7 @@
 #include "bustools_clusterhist.h"
 #include "bustools_extractforexon.h"
 #include "bustools_countunmappedmolreads.h"
-
+#include "bustools_clusterhistunmapped.h"
 
 
 int my_mkdir(const char *path, mode_t mode) {
@@ -789,6 +789,58 @@ void parse_ProgramOptions_clusterhist(int argc, char** argv, Bustools_opt& opt) 
 			break;
 		case 'c':
 			opt.cluster_input_file = optarg;
+			break;
+		default:
+			break;
+		}
+	}
+
+	while (optind < argc) opt.files.push_back(argv[optind++]);
+
+	if (opt.files.size() == 1 && opt.files[0] == "-") {
+		opt.stream_in = true;
+	}
+}
+
+void parse_ProgramOptions_clusterhistunmapped(int argc, char** argv, Bustools_opt& opt) {
+	const char* opt_string = "o:pg:e:t:";
+	int gene_flag = 0;
+	int em_flag = 0;
+	static struct option long_options[] = {
+	  {"output",          required_argument,  0, 'o'},
+	  {"pipe",            no_argument, 0, 'p'},
+	  {"genemap",         required_argument,  0, 'g'},
+	  {"ecmap",           required_argument,  0, 'e'},
+	  {"txnames",         required_argument,  0, 't'},
+	  {"clusterfile",     required_argument,  0, 'c'},
+	  {"unmapped_file",     required_argument,  0, 'u'},
+	  {0,                 0,                  0,  0 }
+	};
+	int option_index = 0, c;
+
+	while ((c = getopt_long(argc, argv, opt_string, long_options, &option_index)) != -1) {
+
+		switch (c) {
+		case 'o':
+			opt.output = optarg;
+			break;
+		case 'p':
+			opt.stream_out = true;
+			break;
+		case 'g':
+			opt.count_genes = optarg;
+			break;
+		case 't':
+			opt.count_txp = optarg;
+			break;
+		case 'e':
+			opt.count_ecs = optarg;
+			break;
+		case 'c':
+			opt.cluster_input_file = optarg;
+			break;
+		case 'u':
+			opt.unmappedFile = optarg;
 			break;
 		default:
 			break;
@@ -1821,6 +1873,114 @@ bool check_ProgramOptions_clusterhist(Bustools_opt& opt) {
 	return ret;
 }
 
+bool check_ProgramOptions_clusterhistunmapped(Bustools_opt& opt) {
+	bool ret = true;
+
+	// check for output directory
+	if (opt.output.empty()) {
+		std::cerr << "Error: Missing output directory" << std::endl;
+		ret = false;
+	}
+	else {
+		bool isDir = false;
+		if (checkDirectoryExists(opt.output)) {
+			isDir = true;
+		}
+		else {
+			if (opt.output.at(opt.output.size() - 1) == '/') {
+				if (my_mkdir(opt.output.c_str(), 0777) == -1) {
+					std::cerr << "Error: could not create directory " << opt.output << std::endl;
+					ret = false;
+				}
+				else {
+					isDir = true;
+				}
+			}
+		}
+
+		std::string histDir = opt.output + "cluster_hists/";
+		//generate directory
+		if (!checkDirectoryExists(histDir)) {
+			if (my_mkdir(histDir.c_str(), 0777) == -1) {
+				std::cerr << "Error: could not create directory " << opt.output << std::endl;
+				ret = false;
+			}
+		}
+	}
+
+	if (opt.files.size() == 0) {
+		std::cerr << "Error: Missing BUS input files" << std::endl;
+		ret = false;
+	}
+	else {
+		if (!opt.stream_in) {
+			for (const auto& it : opt.files) {
+				if (!checkFileExists(it)) {
+					std::cerr << "Error: File not found, " << it << std::endl;
+					ret = false;
+				}
+			}
+		}
+	}
+
+	if (opt.count_genes.size() == 0) {
+		std::cerr << "Error: missing gene mapping file" << std::endl;
+		ret = false;
+	}
+	else {
+		if (!checkFileExists(opt.count_genes)) {
+			std::cerr << "Error: File not found " << opt.count_genes << std::endl;
+			ret = false;
+		}
+	}
+
+	if (opt.count_ecs.size() == 0) {
+		std::cerr << "Error: missing equivalence class mapping file" << std::endl;
+		ret = false;
+	}
+	else {
+		if (!checkFileExists(opt.count_ecs)) {
+			std::cerr << "Error: File not found " << opt.count_ecs << std::endl;
+			ret = false;
+		}
+	}
+
+	if (opt.count_txp.size() == 0) {
+		std::cerr << "Error: missing transcript name file" << std::endl;
+		ret = false;
+	}
+	else {
+		if (!checkFileExists(opt.count_txp)) {
+			std::cerr << "Error: File not found " << opt.count_txp << std::endl;
+			ret = false;
+		}
+	}
+
+	if (opt.cluster_input_file.size() == 0) {
+		std::cerr << "Error: missing transcript name file" << std::endl;
+		ret = false;
+	}
+	else {
+		if (!checkFileExists(opt.cluster_input_file)) {
+			std::cerr << "Error: File not found " << opt.cluster_input_file << std::endl;
+			ret = false;
+		}
+	}
+
+	if (opt.unmappedFile.size() == 0) {
+		std::cerr << "Error: missing umnapped file" << std::endl;
+		ret = false;
+	}
+	else {
+		if (!checkFileExists(opt.cluster_input_file)) {
+			std::cerr << "Error: File not found " << opt.cluster_input_file << std::endl;
+			ret = false;
+		}
+	}
+
+	return ret;
+}
+
 bool check_ProgramOptions_extract(Bustools_opt &opt) {
   bool ret = true;
   
@@ -1961,6 +2121,7 @@ void Bustools_Usage() {
   << "predict         Correct the count matrix using prediction of unseen species" << std::endl
   << "collapse        Turn BUS files into a BUG file" << std::endl
   << "clusterhist     Create UMI histograms per cluster" << std::endl
+  << "clusterhistunmapped     Create UMI histograms per cluster with all counts, not just mapped ones" << std::endl
   << "linker          Remove section of barcodes in BUS files" << std::endl
   << "version         Prints version number" << std::endl 
   << "cite            Prints citation information" << std::endl
@@ -2136,6 +2297,19 @@ void Bustools_clusterhist_Usage() {
   << "-e, --ecmap           File for mapping equivalence classes to transcripts" << std::endl
   << "-t, --txnames         File with names of transcripts" << std::endl
   << "-c, --clusterfile     File with cell cluster assignments" << std::endl
+  << "-p, --pipe            Write to standard output" << std::endl
+  << std::endl;
+}
+
+void Bustools_clusterhistunmapped_Usage() {
+  std::cout << "Usage: bustools collapse [options] sorted-bus-files" << std::endl << std::endl
+  << "Options: " << std::endl
+  << "-o, --output          Output directory gene matrix files" << std::endl
+  << "-g, --genemap         File for mapping transcripts to genes" << std::endl
+  << "-e, --ecmap           File for mapping equivalence classes to transcripts" << std::endl
+  << "-t, --txnames         File with names of transcripts" << std::endl
+  << "-c, --clusterfile     File with cell cluster assignments" << std::endl
+  << "-u, --unmapped_file   File from countunmappedmolreads" << std::endl
   << "-p, --pipe            Write to standard output" << std::endl
   << std::endl;
 }
@@ -2374,6 +2548,18 @@ int main(int argc, char **argv) {
 	    bustools_clusterhist(opt);
       } else {
         Bustools_clusterhist_Usage();
+        exit(1);
+      }
+    } else if (cmd == "clusterhistunmapped") {
+      if (disp_help) {
+        Bustools_clusterhistunmapped_Usage();
+        exit(0);        
+      }
+      parse_ProgramOptions_clusterhistunmapped(argc-1, argv+1, opt);
+      if (check_ProgramOptions_clusterhistunmapped(opt)) { //Program options are valid
+	    bustools_clusterhistunmapped(opt);
+      } else {
+        Bustools_clusterhistunmapped_Usage();
         exit(1);
       }
     } else if (cmd == "extract") {

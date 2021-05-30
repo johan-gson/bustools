@@ -5,11 +5,14 @@
 #include "Common.hpp"
 #include "BUSData.h"
 
-#include "bustools_clusterhist.h"
+#include "bustools_clusterhistunmapped.h"
 #include <random>
 #include <map>
 
-void bustools_clusterhist(Bustools_opt& opt) {
+//This command reads both the bus file and the unmapped reads text file. Since they are both sorted,
+//we can read each molecule from both files. It then outputs the same as bustools_clusterhist, but with
+//the unmapped counts.
+void bustools_clusterhistunmapped(Bustools_opt& opt) {
 	BUSHeader h;
 	size_t nr = 0;
 	size_t N = 100000;
@@ -89,12 +92,22 @@ void bustools_clusterhist(Bustools_opt& opt) {
 		clusterHistograms.push_back(std::vector<double>(n_genes * histmax, 0));
 	}
 
+	//for reading the unmapped reads
+	struct Record {
+		std::string bc, umi;
+		uint32_t mapped=0, totCounts=0;
+	};
+	std::vector<Record> records;
+	v.reserve(10000);
 
+	
+	uint32_t flag = 0;
 	//barcodes 
-	auto write_barcode = [&](const std::vector<BUSData>& v) {
+	auto write_barcode = [&](const std::vector<BUSData>& v, const std::vector<Record>& records) {
 		if (v.empty()) {
 			return;
 		}
+		
 		auto it = bcClusters.find(v[0].barcode);
 		if (it == bcClusters.end()) {
 			return; //This is ok, could be a cell that has been filtered in quality check
@@ -102,6 +115,7 @@ void bustools_clusterhist(Bustools_opt& opt) {
 
 		auto& hist = clusterHistograms[it->second];
 
+		size_t umiInd = 0;
 		size_t n = v.size();
 
 		for (size_t i = 0; i < n; ) {
@@ -121,18 +135,35 @@ void bustools_clusterhist(Bustools_opt& opt) {
 			}
 
 			intersect_genes_of_ecs(ecs, ec2genes, glist);
+			//so, the list of UMIs should be exactly the same in the records. But, check it anyway
+			
+			
+			//check that the UMI is the same
+			if (stringToBinary(records[umiInd].umi, flag) != v[i].UMI) {
+				std::cout << "UMI mismatch: " << records[umiInd].umi << " in BUS File: " << binaryToString(v[i].UMI, records[umiInd].umi.length()) << std::endl;
+			} //else {
+			//	std::cout << "UMI matched: " << records[umiInd].umi << " in BUS File: " << binaryToString(v[i].UMI, records[umiInd].umi.length()) << std::endl;
+			//}
+			
+			uint32_t countsToUse = std::max(records[umiInd].mapped, records[umiInd].totCounts); //the main purpose of max here is that there is a risk that totCounts is zero due to barcode read errors that have been corrected in the bus file
+			
 			if (glist.size() == 1) {
 				//Fill in histograms for prediction.
 				if (glist[0] < n_genes) { //crasches with an invalid gene file otherwise
-					hist[glist[0] * histmax + std::min(counts - 1, histmax - 1)] += 1.0; //histmax-1 since histograms[g][0] is the histogram value for 1 copy and so forth
+					hist[glist[0] * histmax + std::min(countsToUse - 1, histmax - 1)] += 1.0; //histmax-1 since histograms[g][0] is the histogram value for 1 copy and so forth
 				}
 				else {
 					std::cerr << "Mismatch between gene file and bus file, the bus file contains gene indices that is outside the gene range!\n";
 				}
 			}
 			i = j; // increment
+			umiInd++;
 		}
 	};
+	
+	std::ifstream ifs(opt.unmappedFile);
+	Record cr;
+	std::string current_bc_txt = "";
 
 	for (const auto& infn : opt.files) {
 		std::streambuf* inbuf;
@@ -164,17 +195,37 @@ void bustools_clusterhist(Bustools_opt& opt) {
 				if (p[i].barcode != current_bc) {
 					// output whatever is in v
 					if (!v.empty()) {
-						write_barcode(v);
+						std::string matchingBC = binaryToString(v[0].barcode, bclen);
+						//read the records from the text file
+						bool saveRec = false;
+						while (ifs >> cr.bc >> cr.umi >> cr.mapped >> cr.totCounts) {
+							if (cr.bc != matchingBC) {
+								saveRec = true;
+								break;
+							}
+							records.push_back(cr);
+						}
+						// output whatever is in v
+						write_barcode(v, records);
+						v.clear();
+						records.clear();
+						current_bc = p[i].barcode;
+						if (saveRec) {
+							records.push_back(cr);
+						}
 					}
-					v.clear();
 					current_bc = p[i].barcode;
 				}
 				v.push_back(p[i]);
-
+				//std::cout << "BC: " << binaryToString(p[i].barcode, h.bclen) << " UMI: " << binaryToString(p[i].UMI, h.umilen)  << std::endl;
 			}
 		}
 		if (!v.empty()) {
-			write_barcode(v);
+			while (ifs >> cr.bc >> cr.umi >> cr.mapped >> cr.totCounts) {
+				records.push_back(cr);//no need to check anything here, this should be the last bc
+			}
+			// output whatever is in v
+			write_barcode(v, records);
 		}
 
 		if (!opt.stream_in) {
@@ -225,3 +276,5 @@ void bustools_clusterhist(Bustools_opt& opt) {
 
 	//std::cerr << "Read in " << nr << " BUS records" << std::endl;
 }
+
+

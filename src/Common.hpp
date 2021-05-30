@@ -67,6 +67,7 @@ struct Bustools_opt {
 
   /* extractforexon*/
   std::string exonFile;
+  std::string unmappedFile;
   
   /* whitelist */
   int threshold;

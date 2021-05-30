@@ -1,6 +1,17 @@
 ../../build/src/bustools extractforexon -o outfile.txt -f 1.fastq.gz,2.fastq.gz Sdk2.gene.molecules.txt
 
 #to run on the real data
-cd /mnt/d/SCDatasets/MCOR3/10xv3/c/L8TX_181211_01_C01_S01_L003/bus_output
+cd /mnt/d/SCDatasets/MCOR3/10xv3/C/L8TX_181211_01_C01_S01_L003/bus_output
 
-/mnt/c/Work/cpp/BustoolsExonExperiments/bustools/build/src/bustools extractforexon -o exonReads.txt -f ../L8TX_181211_01_C01_S01_L003_R1_001.fastq.gz,L8TX_181211_01_C01_S01_L003_R2_001.fastq.gz Sdk2.gene.molecules.txt
+/mnt/c/Work/cpp/BustoolsExonExperiments/bustools/build/src/bustools extractforexon -o exonReads.txt -f ../L8TX_181211_01_C01_S01_L003_R1_001.fastq.gz,../L8TX_181211_01_C01_S01_L003_R2_001.fastq.gz Sdk2.gene.molecules.txt
+
+/mnt/c/Work/cpp/BustoolsExonExperiments/bustools/build/src/bustools extractforexon -o exonReadsPlce1.txt -f ../L8TX_181211_01_C01_S01_L003_R1_001.fastq.gz,../L8TX_181211_01_C01_S01_L003_R2_001.fastq.gz Plce1.gene.molecules.txt
+
+cd /mnt/e/Butterfly/EVAL/cu_processing
+/mnt/c/Work/cpp/BustoolsExonExperiments/bustools/build/src/bustools countunmappedmolreads -o molInclUnmapped.txt -f ../Cortex1.CCKVLANXX.10X_2A.unmapped.1.fastq.gz,../Cortex1.CCKVLANXX.10X_2A.unmapped.2.fastq.gz,../Cortex1.CCKVLANXX.10X_2B.unmapped.1.fastq.gz,../Cortex1.CCKVLANXX.10X_2B.unmapped.2.fastq.gz,../Cortex1.CCKVLANXX.10X_2C.unmapped.1.fastq.gz,../Cortex1.CCKVLANXX.10X_2C.unmapped.2.fastq.gz,../Cortex1.CCKVLANXX.10X_2D.unmapped.1.fastq.gz,../Cortex1.CCKVLANXX.10X_2D.unmapped.2.fastq.gz umicorr.bus
+
+#On the huge mouse cortex dataset, test if it works there or if we run out of memory
+cd /mnt/d/SCDatasets/MCOR3/10xv3/C/L8TX_181211_01_C01_S01_L003/bus_output
+/mnt/c/Work/cpp/BustoolsExonExperiments/bustools/build/src/bustools countunmappedmolreads -o molInclUnmapped.txt -f ../L8TX_181211_01_C01_S01_L003_R1_001.fastq.gz,../L8TX_181211_01_C01_S01_L003_R2_001.fastq.gz umicorr.bus
+/mnt/c/Work/cpp/BustoolsExonExperiments/bustools/build/src/bustools countunmappedmolreads -o molInclUnmapped.txt -f ../L8TX_181211_01_C01_S01_L003_R1_001.fastq.gz,../L8TX_181211_01_C01_S01_L003_R2_001.fastq.gz umicorr.bus
+/mnt/c/Work/cpp/BustoolsExonExperiments/bustools/build/src/bustools clusterhistunmapped -o ./clustering_unmapped/ -e matrix.ec -g transcripts_to_genes.txt -t transcripts.txt --clusterfile clusters_class_level.txt --unmapped_file molInclUnmapped.txt umicorr.bus
